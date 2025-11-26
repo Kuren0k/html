@@ -2,30 +2,48 @@
 
 namespace App\Controllers;
 
-use AllowDynamicProperties;
-use App\Models\Post;
+use App\Interfaces\PostRepositoryInterface;
+use App\Models\Article;
 use App\Views\FrontView;
+use Laminas\Diactoros\Response;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
-#[AllowDynamicProperties] class FrontController
+class FrontController
 {
-    private Post $postModel;
-    private FrontView $view;
+    private PostRepositoryInterface $postRepository;
+    private FrontView $front_view;
 
-    public function __construct(Post $postModel, FrontView $view)
+    public function __construct( PostRepositoryInterface $repository, FrontView $frontview)
     {
-        $this->postModel = $postModel;
-        $this->view = $view;
+        $this->postRepository = $repository;
+        $this->front_view = $frontview;
     }
 
-    public function index()
+    public function responseWrapper(string $str):ResponseInterface
     {
-        $this->view->render("../templates/index.php");
+        $response = new Response();
+        $response->getBody()->write($str);
+        return $response;
+
+    }
+    public function index(ServerRequestInterface $request): ResponseInterface
+    {
+        $posts = $this->postRepository->all();
+        $html = $this->front_view->homePage($posts);
+        return $this->responseWrapper($html);
     }
 
-    public function showPostsList()
+    public function showPost(ServerRequestInterface $request, array $args): ResponseInterface
     {
-        $posts = $this->postModel->all();
-        $this->view->render("../templates/showPostsList.php", ["posts" => $posts]);
+        $id = (int)$args['id'];
+        $post = $this->postRepository->find($id);
+        if (!$post) {
+            $html = $this->front_view->error404();
+            return $this->responseWrapper($html);
+        }
+        $html = $this->front_view->article($post);
+        return $this->responseWrapper($html);
     }
 
 }
